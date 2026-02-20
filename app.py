@@ -2,181 +2,139 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import requests
 import time
-import os
-import socket
+import json
+from threading import Thread
+import uuid
 
 app = Flask(__name__)
-CORS(app)  # دي بتخلي أي موقع يتصل بيك
+CORS(app)  # عشان يسمح للفرونت إند يتكلم معاه
 
-# إعدادات فودافون
-TOKEN_URL = "https://mobile.vodafone.com.eg/auth/realms/vf-realm/protocol/openid-connect/token"
-CLIENT_SECRET = "95fd95fb-7489-4958-8ae6-d31a525cd20a"
-CLIENT_ID = "ana-vodafone-app"
+# تخزين مؤقت للنتائج (في الذاكرة)
+tasks = {}
 
-def get_access_token(number, password):
-    """الحصول على رمز الدخول"""
+# الكود الأصلي بتاعك (عدلته شوية)
+def check_account_task(task_id, number, password):
+    """الدالة اللي بتشغل الكود بتاعك"""
+    
+    token_url = "https://mobile.vodafone.com.eg/auth/realms/vf-realm/protocol/openid-connect/token"
+    
+    # 1. جلب التوكن
     payload = {
         'grant_type': "password",
         'username': number,
         'password': password,
-        'client_secret': CLIENT_SECRET,
-        'client_id': CLIENT_ID
+        'client_secret': "95fd95fb-7489-4958-8ae6-d31a525cd20a",
+        'client_id': "ana-vodafone-app"
     }
-    headers = {
+    
+    headers_token = {
         'User-Agent': "okhttp/4.11.0",
         'clientId': "AnaVodafoneAndroid",
         'x-agent-version': "2025.11.1"
     }
-    try:
-        response = requests.post(TOKEN_URL, data=payload, headers=headers, timeout=15)
-        if response.status_code == 200:
-            return response.json().get("access_token", "")
-        else:
-            return None
-    except Exception as e:
-        print(f"❌ Token error: {e}")
-        return None
-
-def get_promotions(number, access_token):
-    """جلب العروض"""
-    url = "https://web.vodafone.com.eg/services/dxl/ramadanpromo/promotion"
-    params = {
-        '@type': "RamadanHub",
-        'channel': "website",
-        'msisdn': number
-    }
-    headers = {
-        'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-        'Accept': "application/json",
-        'Authorization': f"Bearer {access_token}",
-        'msisdn': number,
-        'clientId': "WebsiteConsumer",
-        'api-host': "PromotionHost",
-        'channel': "APP_PORTAL",
-        'Content-Type': "application/json",
-        'X-Requested-With': "com.emeint.android.myservices",
-        'Referer': "https://web.vodafone.com.eg/portal/bf/hub"
-    }
-    try:
-        response = requests.get(url, params=params, headers=headers, timeout=15)
-        return response.json()
-    except Exception as e:
-        print(f"❌ Promo error: {e}")
-        return {}
-
-@app.route('/scan', methods=['POST'])
-def scan_cards():
-    """نقطة النهاية الرئيسية للمسح"""
-    data = request.get_json()
     
-    # التحقق من المدخلات
-    if not data:
-        return jsonify({
-            'success': False,
-            'error': 'Please send JSON data'
-        }), 400
-    
+    try:
+        response = requests.post(token_url, data=payload, headers=headers_token)
+        token = response.json().get("access_token", "")
+        
+        if not token:
+            tasks[task_id] = {"status": "error", "message": "فشل تسجيل الدخول"}
+            return
+        
+        # 2. جلب العروض
+        promo_url = "https://web.vodafone.com.eg/services/dxl/ramadanpromo/promotion"
+        params = {
+            '@type': "RamadanHub",
+            'channel': "website",
+            'msisdn': number
+        }
+        
+        headers_promo = {
+            'User-Agent': "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
+            'Authorization': f"Bearer {token}",
+            'msisdn': number,
+            'clientId': "WebsiteConsumer",
+            'channel': "APP_PORTAL"
+        }
+        
+        response = requests.get(promo_url, params=params, headers=headers_promo)
+        data = response.json()
+        
+        # 3. استخراج الكروت
+        cards = []
+        if isinstance(data, list) and len(data) > 1:
+            patterns = data[1].get("pattern", [])
+            
+            for item in patterns:
+                actions = item.get("action", [])
+                for action in actions:
+                    chars = action.get("characteristics", [])
+                    
+                    char_dict = {}
+                    for char in chars:
+                        if isinstance(char, dict) and 'name' in char and 'value' in char:
+                            char_dict[char['name']] = char['value']
+                    
+                    amount = char_dict.get('amount', 'N/A')
+                    units = char_dict.get('GIFT_UNITS', 'N/A')
+                    remaining = char_dict.get('REMAINING_DEDICATIONS', 'N/A')
+                    card = char_dict.get('CARD_SERIAL', '')
+                    
+                    if card and amount != 'N/A' and not card.startswith("015"):
+                        cards.append({
+                            "code": f"*858*{card}#",
+                            "amount": amount,
+                            "units": units,
+                            "remaining": remaining
+                        })
+                        time.sleep(0.1)
+        
+        tasks[task_id] = {
+            "status": "completed",
+            "cards": cards,
+            "count": len(cards)
+        }
+        
+    except Exception as e:
+        tasks[task_id] = {"status": "error", "message": str(e)}
+
+@app.route('/api/check', methods=['POST'])
+def check_account():
+    """الـ endpoint اللي بيستقبل الطلبات من المستخدم"""
+    data = request.json
     number = data.get('number')
     password = data.get('password')
     
     if not number or not password:
-        return jsonify({
-            'success': False,
-            'error': 'Please provide both number and password'
-        }), 400
+        return jsonify({"error": "الرقم وكلمة السر مطلوبين"}), 400
     
-    print(f"\n📱 Scanning for: {number}")
-    print(f"⏰ Time: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    # إنشاء ID فريد للمهمة
+    task_id = str(uuid.uuid4())
     
-    # الحصول على التوكن
-    token = get_access_token(number, password)
-    if not token:
-        return jsonify({
-            'success': False,
-            'error': 'خطأ في الرقم أو كلمة المرور'
-        }), 401
+    # تخزين المهمة (حالتها: قيد التنفيذ)
+    tasks[task_id] = {"status": "processing"}
     
-    # جلب العروض
-    response_data = get_promotions(number, token)
-    cards = []
+    # تشغيل الفحص في Thread منفصل (عشان المستخدم ما ينتظرش)
+    thread = Thread(target=check_account_task, args=(task_id, number, password))
+    thread.daemon = True
+    thread.start()
     
-    # تحليل البيانات
-    try:
-        if isinstance(response_data, list) and len(response_data) > 1:
-            patterns = response_data[1].get("pattern", [])
-            print(f"📦 Found {len(patterns)} patterns")
-            
-            for item in patterns:
-                try:
-                    actions = item.get("action", [])
-                    for action in actions:
-                        chars = action.get("characteristics", [])
-                        
-                        char_dict = {}
-                        for char in chars:
-                            if isinstance(char, dict) and 'name' in char and 'value' in char:
-                                char_dict[char['name']] = char['value']
-                        
-                        # استخراج البيانات
-                        amount = char_dict.get('amount', 'N/A')
-                        units = char_dict.get('GIFT_UNITS', 'N/A')
-                        remaining = char_dict.get('REMAINING_DEDICATIONS', 'N/A')
-                        card = char_dict.get('CARD_SERIAL', '')
-                        
-                        # إضافة الكارت لو موجود
-                        if card and amount != 'N/A' and not card.startswith("015"):
-                            try:
-                                amount_value = float(amount) if amount != 'N/A' else 0
-                                
-                                # طباعة في التيرمنال
-                                print(f"✅ Found card: {card} - {amount} EGP")
-                                
-                                # إضافة للنتيجة
-                                cards.append({
-                                    'card_number': card,
-                                    'value': amount_value,
-                                    'units': int(units) if units != 'N/A' and str(units).isdigit() else 0,
-                                    'remaining_charges': int(remaining) if remaining != 'N/A' and str(remaining).isdigit() else 0,
-                                    'code': f"*858*{card}#"
-                                })
-                            except (ValueError, TypeError):
-                                continue
-                except Exception as e:
-                    continue
-    except Exception as e:
-        print(f"❌ Parse error: {e}")
-    
-    print(f"\n✨ Found {len(cards)} card(s)")
-    print("-" * 50)
-    
-    return jsonify({
-        'success': True,
-        'account': number,
-        'total_cards': len(cards),
-        'cards': cards,
-        'timestamp': time.strftime('%Y-%m-%d %H:%M:%S')
-    })
+    # رجع للمستخدم الـ task_id عشان يسأل بالنتيجة بعدين
+    return jsonify({"task_id": task_id, "status": "processing"})
 
-@app.route('/', methods=['GET'])
-def home():
-    """الصفحة الرئيسية"""
-    return jsonify({
-        'name': 'Vodafone Card Scanner API',
-        'version': '3.0',
-        'status': 'running',
-        'endpoints': {
-            '/scan': 'POST - Scan for cards (send JSON with number and password)',
-            '/': 'GET - This info'
-        },
-        'how_to_use': {
-            'method': 'POST',
-            'url': '/scan',
-            'headers': {'Content-Type': 'application/json'},
-            'body': {'number': '010xxxxxxxx', 'password': 'your_password'}
-        }
-    })
+@app.route('/api/result/<task_id>', methods=['GET'])
+def get_result(task_id):
+    """الـ endpoint اللي بيستعلم عن نتيجة المهمة"""
+    task = tasks.get(task_id)
+    if not task:
+        return jsonify({"error": "المهمة غير موجودة"}), 404
+    
+    return jsonify(task)
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """للتحقق إن السيرفر شغال"""
+    return jsonify({"status": "running"})
 
 if __name__ == '__main__':
-    # Render بيدخل PORT في متغيرات البيئة
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(debug=True, port=5000)
