@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vodafone Offers Checker - Monitoring</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff00;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        h2 {
+            color: #00ff00;
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 24px;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .input-section {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #00ff00;
+            margin-bottom: 20px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #00ff00;
+            font-size: 14px;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+
+        input:focus {
+            outline: none;
+            box-shadow: 0 0 10px #00ff00;
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            background: #00ff00;
+            color: #0a0a0a;
+            border: none;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+
+        button:hover:not(:disabled) {
+            background: #00cc00;
+            box-shadow: 0 0 20px #00ff00;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .terminal {
+            background: #0a0a0a;
+            border: 2px solid #00ff00;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .terminal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #00ff00;
+        }
+
+        .terminal-header button {
+            width: auto;
+            padding: 5px 10px;
+            background: transparent;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .log-line {
+            margin: 2px 0;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-time {
+            color: #666;
+            margin-right: 10px;
+        }
+
+        .log-info { color: #00ff00; }
+        .log-error { color: #ff4444; }
+        .log-success { color: #44ff44; }
+        .log-warning { color: #ffff44; }
+        .log-data { color: #44ffff; }
+
+        .result-section {
+            background: #1a1a1a;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #00ff00;
+        }
+
+        .card {
+            background: #0a0a0a;
+            border: 1px solid #00ff00;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+
+        .card .code {
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 18px;
+            text-align: center;
+            color: #ffff00;
+            border: 1px dashed #00ff00;
+            margin-top: 10px;
+        }
+
+        .stats {
+            background: #0a0a0a;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            text-align: center;
+            border: 1px solid #00ff00;
+        }
+
+        .error {
+            color: #ff4444;
+            padding: 10px;
+            border: 1px solid #ff4444;
+            border-radius: 4px;
+        }
+
+        .network-tab {
+            background: #1a1a1a;
+            border: 1px solid #00ff00;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .network-line {
+            padding: 5px;
+            border-bottom: 1px solid #333;
+            cursor: pointer;
+        }
+
+        .network-line:hover {
+            background: #333;
+        }
+
+        .method-post {
+            color: #ffaa00;
+            font-weight: bold;
+        }
+
+        .status-200 {
+            color: #00ff00;
+        }
+
+        .status-error {
+            color: #ff4444;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #00ff00;
+            font-size: 12px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🔍 VODAFONE OFFERS CHECKER</h2>
+        
+        <div class="input-section">
+            <div class="input-group">
+                <label>📱 > رقم الموبايل</label>
+                <input type="text" id="number" placeholder="01009341792" value="01009341792">
+            </div>
+
+            <div class="input-group">
+                <label>🔑 > كلمة المرور</label>
+                <input type="password" id="password" placeholder="********" value="Kareem1234##">
+            </div>
+
+            <div class="input-group">
+                <label>🎯 > عدد العروض</label>
+                <input type="number" id="count" value="5" min="1" max="50">
+            </div>
+
+            <div class="input-group">
+                <label>🌐 > طريقة الإرسال</label>
+                <select id="method" style="width: 100%; padding: 12px; background: #0a0a0a; border: 1px solid #00ff00; color: #00ff00; font-family: 'Courier New', monospace;">
+                    <option value="fetch">Fetch API (CORS)</option>
+                    <option value="jsonp" selected>JSONP</option>
+                    <option value="form">Form + Iframe</option>
+                    <option value="proxy">CORS Proxy</option>
+                </select>
+            </div>
+
+            <button onclick="startProcess()" id="submitBtn">🚀 > تنفيذ</button>
+        </div>
+
+        <!-- شاشة التيرمينال -->
+        <div class="terminal">
+            <div class="terminal-header">
+                <span>⚡ TERMINAL LOG</span>
+                <button onclick="clearTerminal()">🗑️ مسح</button>
+            </div>
+            <div class="terminal-content" id="terminal"></div>
+        </div>
+
+        <!-- مراقب الشبكة -->
+        <div class="network-tab" id="networkTab">
+            <div style="color: #00ff00; margin-bottom: 10px;">🌐 NETWORK MONITOR</div>
+            <div id="networkLogs"></div>
+        </div>
+
+        <!-- النتائج -->
+        <div class="result-section" id="result"></div>
+        
+        <div class="footer">
+            <span># SYSTEM READY | TIME: <span id="timer">00:00</span></span>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbx-YDQCcH38vZjdsoE9ab1NkQNKEAwdiIh_fASnXqYzMX6-ec4xOajZpMa4iW8-6JqfzQ/exec";
+        let networkLogs = [];
+        
+        // دالة إضافة log إلى التيرمينال
+        function addLog(message, type = 'info') {
+            const terminal = document.getElementById('terminal');
+            const time = new Date().toLocaleTimeString('ar-EG', { hour12: false });
+            
+            let colorClass = 'log-info';
+            if (type === 'error') colorClass = 'log-error';
+            if (type === 'success') colorClass = 'log-success';
+            if (type === 'warning') colorClass = 'log-warning';
+            if (type === 'data') colorClass = 'log-data';
+            
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            logLine.innerHTML = `<span class="log-time">[${time}]</span> <span class="${colorClass}">${message}</span>`;
+            
+            terminal.appendChild(logLine);
+            terminal.scrollTop = terminal.scrollHeight;
+        }
+        
+        // دالة إضافة log للشبكة
+        function addNetworkLog(method, url, status, response) {
+            const networkDiv = document.getElementById('networkLogs');
+            const time = new Date().toLocaleTimeString('ar-EG', { hour12: false });
+            
+            const statusClass = status === 200 ? 'status-200' : 'status-error';
+            const methodClass = method === 'POST' ? 'method-post' : '';
+            
+            const logLine = document.createElement('div');
+            logLine.className = 'network-line';
+            logLine.innerHTML = `
+                <span class="${methodClass}">${method}</span> 
+                <span>[${time}]</span> 
+                <span class="${statusClass}">${status}</span><br>
+                <small style="color: #666;">${url.substring(0, 50)}...</small>
+            `;
+            
+            logLine.onclick = () => {
+                addLog(`📦 Response: ${response}`, 'data');
+            };
+            
+            networkDiv.appendChild(logLine);
+            networkDiv.scrollTop = networkDiv.scrollHeight;
+        }
+        
+        function clearTerminal() {
+            document.getElementById('terminal').innerHTML = '';
+            document.getElementById('networkLogs').innerHTML = '';
+            networkLogs = [];
+            addLog('تم مسح التيرمينال', 'warning');
+        }
+        
+        async function startProcess() {
+            const number = document.getElementById('number').value.trim();
+            const password = document.getElementById('password').value.trim();
+            const count = parseInt(document.getElementById('count').value) || 5;
+            const method = document.getElementById('method').value;
+            
+            document.getElementById('result').innerHTML = '';
+            
+            if (!number || !password) {
+                addLog('❌ خطأ: رقم الموبايل وكلمة المرور مطلوبين', 'error');
+                return;
+            }
+            
+            addLog('🚀 بدء عملية الفحص...', 'info');
+            addLog(`📱 رقم الموبايل: ${number}`, 'data');
+            addLog(`🎯 عدد العروض: ${count}`, 'data');
+            addLog(`🌐 طريقة الإرسال: ${method}`, 'info');
+            
+            document.getElementById('submitBtn').disabled = true;
+            
+            const startTime = Date.now();
+            const timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('timer').textContent = 
+                    `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+            
+            try {
+                let result;
+                
+                switch(method) {
+                    case 'fetch':
+                        result = await sendViaFetch(number, password, count);
+                        break;
+                    case 'jsonp':
+                        result = await sendViaJSONP(number, password, count);
+                        break;
+                    case 'form':
+                        result = await sendViaForm(number, password, count);
+                        break;
+                    case 'proxy':
+                        result = await sendViaProxy(number, password, count);
+                        break;
+                }
+                
+                clearInterval(timerInterval);
+                
+                if (result) {
+                    displayResults(result);
+                }
+                
+            } catch (error) {
+                clearInterval(timerInterval);
+                addLog(`❌ خطأ: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('submitBtn').disabled = false;
+            }
+        }
+        
+        // الطريقة 1: Fetch API
+        async function sendViaFetch(number, password, count) {
+            addLog('📤 محاولة الإرسال عبر Fetch API...', 'info');
+            
+            const data = {
+                number: number,
+                password: password,
+                pashkey: "Shadow_Dev",
+                count: count
+            };
+            
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                addLog(`📨 Response Status: ${response.status}`, 'info');
+                addNetworkLog('POST', API_URL, response.status, '');
+                
+                const text = await response.text();
+                addLog('📄 Response Text:', 'info');
+                addLog(text, 'data');
+                
+                return JSON.parse(text);
+                
+            } catch (error) {
+                addLog(`❌ Fetch Error: ${error.message}`, 'error');
+                addNetworkLog('POST', API_URL, 0, error.message);
+                throw error;
+            }
+        }
+        
+        // الطريقة 2: JSONP
+        function sendViaJSONP(number, password, count) {
+            return new Promise((resolve, reject) => {
+                addLog('📤 محاولة الإرسال عبر JSONP...', 'info');
+                
+                const callbackName = 'callback_' + Date.now();
+                const script = document.createElement('script');
+                
+                const params = new URLSearchParams({
+                    number: number,
+                    password: password,
+                    pashkey: "Shadow_Dev",
+                    count: count,
+                    callback: callbackName
+                });
+                
+                const url = `${API_URL}?${params.toString()}`;
+                script.src = url;
+                
+                addLog(`🔗 URL: ${url}`, 'data');
+                
+                window[callbackName] = function(response) {
+                    addLog('📩 JSONP Response Received', 'success');
+                    addLog(JSON.stringify(response, null, 2), 'data');
+                    
+                    script.remove();
+                    delete window[callbackName];
+                    
+                    resolve(response);
+                };
+                
+                script.onerror = function(error) {
+                    addLog('❌ JSONP Error', 'error');
+                    script.remove();
+                    delete window[callbackName];
+                    reject(new Error('JSONP failed'));
+                };
+                
+                document.head.appendChild(script);
+                addNetworkLog('GET', url, 200, 'JSONP Request');
+            });
+        }
+        
+        // الطريقة 3: Form + Iframe
+        function sendViaForm(number, password, count) {
+            return new Promise((resolve, reject) => {
+                addLog('📤 محاولة الإرسال عبر Form + Iframe...', 'info');
+                
+                const iframe = document.createElement('iframe');
+                const form = document.createElement('form');
+                
+                iframe.style.display = 'none';
+                form.style.display = 'none';
+                
+                document.body.appendChild(iframe);
+                document.body.appendChild(form);
+                
+                form.method = 'POST';
+                form.action = API_URL;
+                form.target = iframe.name = 'iframe_' + Date.now();
+                
+                const fields = {
+                    number: number,
+                    password: password,
+                    pashkey: "Shadow_Dev",
+                    count: count
+                };
+                
+                for (let key in fields) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = fields[key];
+                    form.appendChild(input);
+                }
+                
+                addLog('📦 Form Data:', 'info');
+                addLog(JSON.stringify(fields, null, 2), 'data');
+                
+                // مش هنقدر نقرأ الـ response بسبب CORS
+                // هنفترض انها نجحت
+                addLog('⚠️ Form submitted - Cannot read response due to CORS', 'warning');
+                addLog('✅ Check Google Apps Script execution log', 'info');
+                
+                form.submit();
+                addNetworkLog('POST', API_URL, 200, 'Form Submitted');
+                
+                // هنفترض نجاح مؤقت
+                setTimeout(() => {
+                    iframe.remove();
+                    form.remove();
+                    resolve({ cards: [], message: 'Form submitted - Check server logs' });
+                }, 2000);
+            });
+        }
+        
+        // الطريقة 4: CORS Proxy
+        async function sendViaProxy(number, password, count) {
+            addLog('📤 محاولة الإرسال عبر CORS Proxy...', 'info');
+            
+            const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+            const data = {
+                number: number,
+                password: password,
+                pashkey: "Shadow_Dev",
+                count: count
+            };
+            
+            try {
+                const response = await fetch(proxyUrl + API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                addLog(`📨 Proxy Response Status: ${response.status}`, 'info');
+                addNetworkLog('POST', proxyUrl + API_URL, response.status, '');
+                
+                const text = await response.text();
+                addLog('📄 Response Text:', 'info');
+                addLog(text, 'data');
+                
+                return JSON.parse(text);
+                
+            } catch (error) {
+                addLog(`❌ Proxy Error: ${error.message}`, 'error');
+                addLog('💡 Tip: Open https://cors-anywhere.herokuapp.com/ first', 'warning');
+                throw error;
+            }
+        }
+        
+        function displayResults(data) {
+            addLog('📊 معالجة النتائج...', 'info');
+            
+            let html = '';
+            
+            if (data.error) {
+                addLog(`❌ خطأ: ${data.error}`, 'error');
+                html = `<div class="error">❌ ${data.error}</div>`;
+                
+            } else if (data.cards && data.cards.length > 0) {
+                addLog(`✅ تم العثور على ${data.cards.length} عرض`, 'success');
+                
+                html = `
+                    <div class="stats">
+                        <span>✅ تم العثور على ${data.returned || data.cards.length} عرض</span>
+                        ${data.execution_time_seconds ? `<br><span>⏱️ وقت التنفيذ: ${data.execution_time_seconds} ثانية</span>` : ''}
+                    </div>
+                `;
+                
+                data.cards.forEach((card, index) => {
+                    addLog(`🎁 عرض ${index + 1}: ${card.amount} - ${card.recharge_code}`, 'data');
+                    
+                    html += `
+                        <div class="card">
+                            <div><strong>🎁 عرض ${index + 1}</strong></div>
+                            <div>💰 القيمة: ${card.amount || 'غير محدد'}</div>
+                            <div>📦 الوحدات: ${card.units || 'غير محدد'}</div>
+                            <div>⏳ المتبقي: ${card.remaining || 'غير محدد'}</div>
+                            <div class="code">${card.recharge_code || 'غير متوفر'}</div>
+                        </div>
+                    `;
+                });
+                
+            } else {
+                addLog('⚠️ لا توجد عروض', 'warning');
+                html = '<div class="error">❌ لا توجد عروض متاحة</div>';
+            }
+            
+            document.getElementById('result').innerHTML = html;
+        }
+        
+        // رسالة ترحيب
+        addLog('⚡ النظام جاهز للعمل', 'success');
+        addLog('📝 اختر طريقة الإرسال وجرب', 'info');
+    </script>
+</body>
+</html>
